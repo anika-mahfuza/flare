@@ -1,70 +1,70 @@
-        console.log("[BROWSER] Session cached.");
+import express from 'express';
+import puppeteer from 'puppeteer-core';
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+let cachedSession = { cookies: '', ua: '', timestamp: 0 };
+const SESSION_TTL = 60 * 60 * 1000; 
+
+app.get('/ping', (req, res) => res.send("Alive"));
+
+async function getFreshCookies() {
+    console.log("[BROWSER] Solving Cloudflare...");
+    const browser = await puppeteer.launch({
+        executablePath: '/usr/bin/chromium', // Points to the Docker install
+        headless: "new",
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--single-process',      // IMPORTANT: Stops Render from crashing
+            '--no-zygote',
+            '--disable-dev-shm-usage',
+            '--disable-gpu'
+        ]
+    });
+
+    try {
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+        
+        await page.goto('https://animepahe.pw/', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.waitForFunction(() => !document.title.includes('Just a moment'), { timeout: 30000 });
+
+        const cookies = await page.cookies();
+        cachedSession = {
+            cookies: cookies.map(c => `${c.name}=${c.value}`).join('; '),
+            ua: await page.evaluate(() => navigator.userAgent),
+            timestamp: Date.now()
+        };
+        console.log("[BROWSER] Cookies updated.");
     } finally {
         await browser.close();
     }
 }
 
-// --- 3. MAIN SOLVER ENDPOINT ---
 app.get('/solve', async (req, res) => {
-    const url = req.query.url;
+    const target = req.query.url;
     const force = req.query.force === 'true';
-
-    // Prevent accidental empty requests
-    if (!url) {
-        return res.status(400).json({
-            error: 'No URL provided'
-        });
-    }
+    if (!target) return res.status(400).send("Missing URL");
 
     try {
-        // Refresh session if:
-        // A) No cookies
-        // B) Cache expired
-        // C) Forced refresh requested
-        if (
-            !cachedSession.cookies ||
-            (Date.now() - cachedSession.timestamp) > SESSION_TTL ||
-            force
-        ) {
-            await getFreshCookies('https://animepahe.pw/');
+        if (!cachedSession.cookies || (Date.now() - cachedSession.timestamp) > SESSION_TTL || force) {
+            await getFreshCookies();
         }
 
-        // Request target using cached CF cookies
-        const response = await fetch(url, {
+        const response = await fetch(target, {
             headers: {
                 'Cookie': cachedSession.cookies,
                 'User-Agent': cachedSession.ua,
-                'Referer': 'https://animepahe.pw/',
-                'X-Requested-With': 'XMLHttpRequest'
+                'Referer': 'https://animepahe.pw/'
             }
         });
-
         const text = await response.text();
-
-        let parsed;
-        try {
-            parsed = JSON.parse(text);
-        } catch {
-            parsed = text;
-        }
-
-        res.json({
-            status: response.status,
-            data: parsed,
-            cached: true,
-            forced: force
-        });
-
+        res.json({ status: response.status, data: text });
     } catch (e) {
-        console.error("[SOLVER ERROR]", e);
-
-        res.status(500).json({
-            error: e.message
-        });
+        res.status(500).json({ error: e.message });
     }
 });
 
-// --- 4. START SERVER ---
-app.listen(PORT, () => {
-    console.log(`Solver Bridge Active on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Lightweight Solver ready on port ${PORT}`));
