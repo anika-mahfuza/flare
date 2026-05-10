@@ -1,7 +1,9 @@
 {
+  "name": "lightweight-solver",
+  "version": "1.0.0",
   "type": "module",
   "dependencies": {
     "express": "^4.18.2",
-    "puppeteer": "^22.6.0"
+    "puppeteer-core": "^22.6.0"
   }
 }
