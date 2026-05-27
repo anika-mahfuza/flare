@@ -1,43 +1,39 @@
 import express from 'express';
-import puppeteer from 'puppeteer-core';
+import { firefox } from 'playwright';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 let cachedSession = { cookies: '', ua: '', timestamp: 0 };
-const SESSION_TTL = 60 * 60 * 1000; 
+const SESSION_TTL = 60 * 60 * 1000;
 
 app.get('/ping', (req, res) => res.send("Alive"));
 
 async function getFreshCookies() {
-    console.log("[BROWSER] Solving Cloudflare...");
-    const browser = await puppeteer.launch({
-        executablePath: '/usr/bin/chromium', // Points to the Docker install
-        headless: "new",
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--single-process',      // IMPORTANT: Stops Render from crashing
-            '--no-zygote',
-            '--disable-dev-shm-usage',
-            '--disable-gpu'
-        ]
+    console.log("[BROWSER] Solving DDoS-Guard...");
+    const browser = await firefox.launch({
+        headless: true,
+        firefoxUserPrefs: {
+            'media.navigator.enabled': false,
+            'media.peerconnection.enabled': false,
+        }
     });
 
     try {
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
-        
-        await page.goto('https://animepahe.pw/', { waitUntil: 'networkidle2', timeout: 60000 });
-        await page.waitForFunction(() => !document.title.includes('Just a moment'), { timeout: 30000 });
+        const context = await browser.newContext({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0'
+        });
+        const page = await context.newPage();
+        await page.goto('https://animepahe.pw/', { waitUntil: 'networkidle', timeout: 60000 });
+        await page.waitForFunction(() => !document.title.includes('DDoS-Guard'), { timeout: 30000 });
 
-        const cookies = await page.cookies();
+        const cookies = await context.cookies();
         cachedSession = {
             cookies: cookies.map(c => `${c.name}=${c.value}`).join('; '),
-            ua: await page.evaluate(() => navigator.userAgent),
+            ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
             timestamp: Date.now()
         };
-        console.log("[BROWSER] Cookies updated.");
+        console.log("[BROWSER] Cookies updated:", cachedSession.cookies.substring(0, 80));
     } finally {
         await browser.close();
     }
@@ -67,4 +63,4 @@ app.get('/solve', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => console.log(`Lightweight Solver ready on port ${PORT}`));
+app.listen(PORT, () => console.log(`Solver ready on port ${PORT}`));
