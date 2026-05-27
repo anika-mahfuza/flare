@@ -1,5 +1,7 @@
 FROM node:20-slim
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 RUN apt-get update && apt-get install -y \
     firefox-esr \
     --no-install-recommends \
@@ -8,7 +10,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY package.json .
 RUN npm install --production
-RUN npx playwright install firefox
+RUN npx playwright install firefox && chmod -R 777 /ms-playwright
+
 COPY . .
 
 EXPOSE 3000
