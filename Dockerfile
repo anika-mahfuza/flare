@@ -14,6 +14,6 @@ RUN npx playwright install firefox && chmod -R 777 /ms-playwright
 
 COPY . .
 
-EXPOSE 3000
+EXPOSE 7860
 USER node
 CMD ["node", "server.js"]

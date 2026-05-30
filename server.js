@@ -2,7 +2,7 @@ import express from 'express';
 import { firefox } from 'playwright';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 7860;
 
 let cachedSession = { cookies: '', ua: '', timestamp: 0 };
 const SESSION_TTL = 11 * 30 * 24 * 60 * 60 * 1000; // 11 months
